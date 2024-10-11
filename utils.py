@@ -1,4 +1,24 @@
 import os
+import re
+
+def parse_segments(segments_file_path):
+    segments_dict = {}
+    with open(segments_file_path, 'r') as f:
+        lines = f.readlines()
+        for i in range(0, len(lines), 6):
+            header = lines[i].strip()
+            filename_match = re.match(r'\[(.*?)\]', header)
+            if filename_match:
+                filename = filename_match.group(1)
+                timestamps = []
+                for j in range(1, 6):
+                    time_range = lines[i+j].strip()
+                    start, end = time_range.split('-')
+                    start_sec = convert_time_to_seconds(start)
+                    end_sec = convert_time_to_seconds(end)
+                    timestamps.extend([start_sec, end_sec])
+                segments_dict[filename] = timestamps
+    return segments_dict
 
 def convert_time_to_seconds(time_str):
     parts = [float(p) for p in time_str.split(':')]
