@@ -94,12 +94,16 @@ def train_model(model, dataset):
     model.fit(dataset, epochs=EPOCHS)
 
 def main():
+    # Remove and recreate the MODEL_DIR
     if os.path.exists(MODEL_DIR):
         shutil.rmtree(MODEL_DIR)
     os.makedirs(MODEL_DIR)
+    # Process audio files
     utils.process_audio_files(INPUT_FOLDER)
     segments_path = os.path.join(INPUT_FOLDER, SEGMENTS_FILE)
     segments_dict = utils.parse_segments(segments_path)
+    all_X = []
+    all_y = []
     for filename in os.listdir(INPUT_FOLDER):
         if not filename.endswith('.wav'):
             continue 
@@ -147,15 +151,28 @@ def main():
         print(f"X shape: {X.shape}")
         print(f"y shape: {y.shape}")
         if X.shape[0] == 0:
-            print(f"No valid windows for {filename}. Skipping model training.\n")
+            print(f"No valid windows for {filename}. Skipping.\n")
             continue
-        model = build_model()
-        dataset = tf.data.Dataset.from_tensor_slices((X, y))
-        dataset = dataset.shuffle(buffer_size=1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
-        train_model(model, dataset)
-        model_save_path = os.path.join(MODEL_DIR, f'{filename}_model.h5')
-        model.save(model_save_path)
-        print(f"Model saved to {model_save_path}\n")
+        # Aggregate data
+        all_X.append(X)
+        all_y.append(y)
+    # Combine all data
+    if not all_X:
+        print("No data available for training.")
+        return
+    combined_X = np.concatenate(all_X, axis=0)
+    combined_y = np.concatenate(all_y, axis=0)
+    print(f"Combined X shape: {combined_X.shape}")
+    print(f"Combined y shape: {combined_y.shape}")
+    # Build and train a single model
+    model = build_model()
+    dataset = tf.data.Dataset.from_tensor_slices((combined_X, combined_y))
+    dataset = dataset.shuffle(buffer_size=1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+    train_model(model, dataset)
+    # Save the single trained model
+    model_save_path = os.path.join(MODEL_DIR, 'combined_model.h5')
+    model.save(model_save_path)
+    print(f"Combined model saved to {model_save_path}\n")
 
 if __name__ == '__main__':
     main()
